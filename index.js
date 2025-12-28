@@ -10,13 +10,12 @@ app.get("/", (req, res) => {
 });
 
 app.get("/webhook", (req, res) => {
-  const VERIFY_TOKEN = "mi_token_secreto";
-
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode && token === VERIFY_TOKEN) {
+  if (mode === "subscribe" && token === process.env.VERIFY_TOKEN) {
+    console.log("Webhook verificado correctamente");
     res.status(200).send(challenge);
   } else {
     res.sendStatus(403);
@@ -26,3 +25,4 @@ app.get("/webhook", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
+
