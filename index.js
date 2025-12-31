@@ -3,7 +3,7 @@ const app = express();
 
 // VARIABLES
 const PORT = process.env.PORT || 3000;
-const VERIFY_TOKEN = "mi_token_secreto"; // 👈 EL MISMO que pusiste en Meta
+const VERIFY_TOKEN = "mi_token_secreto"; // 👈 EL MISMO que pusiste en Metasdfsdf
 
 // MIDDLEWARE
 app.use(express.json());
@@ -39,4 +39,5 @@ app.post("/webhook", (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
+
 
