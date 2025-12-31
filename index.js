@@ -1,32 +1,15 @@
-const express = require("express");
-const axios = require("axios");
+import express from "express";
+import fetch from "node-fetch";
 
 const app = express();
-
-// =======================
-// VARIABLES DE ENTORNO
-// =======================
-const PORT = process.env.PORT || 8080;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-
-// =======================
-// MIDDLEWARE
-// =======================
 app.use(express.json());
 
-// =======================
-// RUTA DE PRUEBA
-// =======================
-app.get("/", (req, res) => {
-  res.send("🤖 Bot de WhatsApp activo");
-});
-
-// =======================
-// VERIFICACIÓN DEL WEBHOOK (META)
-// =======================
+/* ============================
+   VERIFICACIÓN DE META (GET)
+============================ */
 app.get("/webhook", (req, res) => {
+  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
@@ -35,67 +18,74 @@ app.get("/webhook", (req, res) => {
     console.log("✅ Webhook verificado");
     return res.status(200).send(challenge);
   } else {
-    console.log("❌ Verificación fallida");
     return res.sendStatus(403);
   }
 });
 
-// =======================
-// RECEPCIÓN DE MENSAJES
-// =======================
+/* ============================
+   MENSAJES ENTRANTES (POST)
+============================ */
 app.post("/webhook", async (req, res) => {
   try {
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
-    const value = changes?.value;
-    const message = value?.messages?.[0];
+    const message = changes?.value?.messages?.[0];
 
-    // Si no hay mensaje, salir
     if (!message) {
       return res.sendStatus(200);
     }
 
-    const from = message.from; // número del usuario
-    const text = message.text?.body?.toLowerCase();
+    const from = message.from; // número del cliente
+    const text = message.text?.body;
 
     console.log("📩 Mensaje recibido:", text);
 
-    // RESPUESTA AUTOMÁTICA
-    if (text === "hola") {
-      await axios.post(
-        `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
-        {
-          messaging_product: "whatsapp",
-          to: from,
-          text: {
-            body:
-              "👋 ¡Hola! Soy el bot de *Pizzas Villa* 🍕\n\n" +
-              "Escribe *menu* para ver las opciones disponibles."
-          }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-    }
+    // 👉 Mensaje automático de bienvenida
+    await enviarMensaje(from, 
+      `👋 ¡Hola! Bienvenido a *Pizzas de Villa* 🍕
+      
+1️⃣ Ordenar pizza  
+2️⃣ Ver menú  
+3️⃣ Hablar con un humano  
+
+Responde con el número de la opción 😊`
+    );
 
     res.sendStatus(200);
+
   } catch (error) {
-    console.error(
-      "❌ Error en webhook:",
-      error.response?.data || error.message
-    );
-    res.sendStatus(200);
+    console.error("❌ Error:", error);
+    res.sendStatus(500);
   }
 });
 
-// =======================
-// SERVIDOR
-// =======================
+/* ============================
+   FUNCIÓN PARA ENVIAR MENSAJES
+============================ */
+async function enviarMensaje(to, body) {
+  const url = `https://graph.facebook.com/v22.0/${process.env.PHONE_NUMBER_ID}/messages`;
+
+  const payload = {
+    messaging_product: "whatsapp",
+    to,
+    type: "text",
+    text: { body }
+  };
+
+  await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.WHATSAPP_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+/* ============================
+   SERVIDOR
+============================ */
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
-
