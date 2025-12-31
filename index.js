@@ -1,91 +1,81 @@
-import express from "express";
-import fetch from "node-fetch";
+const express = require("express");
 
 const app = express();
+
+// VARIABLES
+const PORT = process.env.PORT || 3000;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+
+// MIDDLEWARE
 app.use(express.json());
 
-/* ============================
-   VERIFICACIÓN DE META (GET)
-============================ */
-app.get("/webhook", (req, res) => {
-  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+// RUTA DE PRUEBA
+app.get("/", (req, res) => {
+  res.send("Bot activo 🚀");
+});
 
+// VERIFICACIÓN WEBHOOK
+app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
     console.log("✅ Webhook verificado");
-    return res.status(200).send(challenge);
+    res.status(200).send(challenge);
   } else {
-    return res.sendStatus(403);
+    res.sendStatus(403);
   }
 });
 
-/* ============================
-   MENSAJES ENTRANTES (POST)
-============================ */
+// RECIBIR MENSAJES
 app.post("/webhook", async (req, res) => {
   try {
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+    const value = changes?.value;
+    const message = value?.messages?.[0];
 
     if (!message) {
       return res.sendStatus(200);
     }
 
     const from = message.from; // número del cliente
-    const text = message.text?.body;
+    const text = message.text?.body?.toLowerCase();
 
     console.log("📩 Mensaje recibido:", text);
 
-    // 👉 Mensaje automático de bienvenida
-    await enviarMensaje(from, 
-      `👋 ¡Hola! Bienvenido a *Pizzas de Villa* 🍕
-      
-1️⃣ Ordenar pizza  
-2️⃣ Ver menú  
-3️⃣ Hablar con un humano  
+    // RESPUESTA AUTOMÁTICA
+    await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: from,
+        text: {
+          body: `🍕 ¡Bienvenido a Pizzería Villa!
 
-Responde con el número de la opción 😊`
-    );
+Elige una opción:
+1️⃣ Ver menú
+2️⃣ Hacer pedido
+3️⃣ Horarios y ubicación`,
+        },
+      }),
+    });
 
     res.sendStatus(200);
-
   } catch (error) {
     console.error("❌ Error:", error);
     res.sendStatus(500);
   }
 });
 
-/* ============================
-   FUNCIÓN PARA ENVIAR MENSAJES
-============================ */
-async function enviarMensaje(to, body) {
-  const url = `https://graph.facebook.com/v22.0/${process.env.PHONE_NUMBER_ID}/messages`;
-
-  const payload = {
-    messaging_product: "whatsapp",
-    to,
-    type: "text",
-    text: { body }
-  };
-
-  await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.WHATSAPP_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-}
-
-/* ============================
-   SERVIDOR
-============================ */
-const PORT = process.env.PORT || 8080;
+// SERVIDOR
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
